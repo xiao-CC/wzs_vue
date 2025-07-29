@@ -6,8 +6,8 @@
 import ChinaMap from './components/ChinaMap.vue'
 
 export default {
-  name: 'App',
-  components: {
+  name: 'App',//app.vue的组件名
+  components: { //注册叶子组件
     ChinaMap
   }
 }
