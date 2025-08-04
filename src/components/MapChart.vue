@@ -1,67 +1,91 @@
-//地图图标组件
 <template>
-    <div ref="chartEl" class="map-container"></div>
-  </template>
-  
-  <script setup>
-  import { ref, onMounted, watch, computed } from 'vue';
-  import * as echarts from 'echarts';
-  import { useMapStore } from '@/store/mapStore';
-  
-  const props = defineProps(['mapData']);
-  const chartEl = ref(null);
-  let chartInstance = null;
-  const mapStore = useMapStore();
-  
-  // 初始化图表
-  const initChart = () => {
-    chartInstance = echarts.init(chartEl.value);
-    updateChart();
+  <div id="map-container" ref="mapContainer"></div>
+</template>
+
+<script setup>
+  import { ref, onMounted } from 'vue';
+  import L from 'leaflet';
+  import 'leaflet/dist/leaflet.css';
+
+  // 响应式数据
+  const mapContainer = ref(null);
+  const map = ref(null);
+  const currentLayer = ref(null);
+  const geoJSONData = ref(null);
+
+  // 初始化地图
+  const initMap = () => {
+    if (mapContainer.value) {
+      map.value = L.map(mapContainer.value).setView([43.88, 125.35], 7);
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map.value);
+    }
   };
-  
-  // 更新图表配置
-  const updateChart = () => {
-    const option = {
-      tooltip: { trigger: 'item' },
-      visualMap: {
-        min: 0,
-        max: 10000,
-        text: ['High', 'Low'],
-        calculable: true
-      },
-      series: [{
-        name: '数据',
-        type: 'map',
-        map: mapStore.currentRegion,
-        roam: true,
-        data: props.mapData,
-        emphasis: { label: { show: true }},
-        selectedMode: false
-      }]
-    };
-    
-    chartInstance.setOption(option);
-    
-    // 添加点击下钻事件
-    chartInstance.on('click', params => {
-      if (mapStore.currentLevel === 'country') {
-        mapStore.drillDown(params.name, 'province');
-      } else if (mapStore.currentLevel === 'province') {
-        mapStore.drillDown(params.name, 'city');
+
+  // 加载吉林省地图
+  const loadJilinMap = async () => {
+    try {
+      const jilinGeoJSON = await import('@/assets/吉林省.json');
+      geoJSONData.value = jilinGeoJSON;
+      
+      currentLayer.value = L.geoJSON(geoJSONData.value, {
+        style: {
+          color: '#3388ff',
+          weight: 2,
+          fillOpacity: 0.2
+        },
+        onEachFeature: onEachFeature
+      }).addTo(map.value);
+    } catch (error) {
+      console.error('Failed to load Jilin map:', error);
+    }
+  };
+
+  // 每个要素的处理
+  const onEachFeature = (feature, layer) => {
+    if (feature.properties) {
+      layer.bindPopup(feature.properties.name);
+      layer.on('click', () => {
+        drillDown(feature.properties.name);
+      });
+    }
+  };
+
+  // 下钻到市级地图
+  const drillDown = async (cityName) => {
+    try {
+      const cityGeoJSON = await import(`@/assets/${cityName}.json`);
+      if (currentLayer.value) {
+        map.value.removeLayer(currentLayer.value);
       }
-    });
+      
+      currentLayer.value = L.geoJSON(cityGeoJSON.default, {
+        style: {
+          color: '#ff7800',
+          weight: 2,
+          fillOpacity: 0.4
+        },
+        onEachFeature: onEachFeature
+      }).addTo(map.value);
+      
+      map.value.fitBounds(currentLayer.value.getBounds());
+    } catch (error) {
+      console.error('Failed to load city data:', error);
+    }
   };
-  
-  watch(() => mapStore.geoJson, () => {
-    if (!chartInstance) return;
-    
-    // 注销旧地图
-    echarts.unregisterMap(mapStore.currentRegion);
-    
-    // 注册新地图
-    echarts.registerMap(mapStore.currentRegion, mapStore.geoJson);
-    updateChart();
+
+  // 生命周期钩子
+  onMounted(() => {
+    initMap();
+    loadJilinMap();
   });
-  
-  onMounted(initChart);
-  </script>
+</script>
+
+<style scoped>
+#map-container {
+  height: 600px;
+  width: 100%;
+}
+</style>

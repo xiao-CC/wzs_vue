@@ -1,14 +1,14 @@
 <template>
-  <ChinaMap />
+  <MapChart />
 </template>
 
 <script>
-import ChinaMap from './components/ChinaMap.vue'
+import MapChart from './components/MapChart.vue';
 
 export default {
   name: 'App',//app.vue的组件名
   components: { //注册叶子组件
-    ChinaMap
+    MapChart
   }
 }
 </script>
